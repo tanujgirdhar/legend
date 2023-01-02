@@ -1,0 +1,178 @@
+###Diagram
+Diagram models::FinalTradeAccountDiagram
+{
+  classView 2607efb4-489b-451c-9fe0-3ee0f71191db
+  {
+    class: models::Trade;
+    position: (1150.5257568359375,706.5);
+    rectangle: (208.16666793823242,184.0);
+  }
+  classView 3f9f55f3-0f34-4aa5-972b-6fb0d0839393
+  {
+    class: models::TradeEvent;
+    position: (1528.4548415786112,750.0066923369803);
+    rectangle: (146.73333358764648,72.0);
+  }
+  classView dbbcb7fc-5ca1-485d-a9e6-86bcb5813b9d
+  {
+    class: models::Account;
+    position: (804.5257568359375,756.0);
+    rectangle: (179.53759765625,72.0);
+  }
+  classView 742b39b1-983a-4913-bad9-a45654973427
+  {
+    class: models::AccountWithConstraints;
+    position: (789.9989051643056,921.25);
+    rectangle: (206.46875,58.0);
+  }
+  classView 931cb999-5873-4fcd-8e9b-0ca4f1cf9a3f
+  {
+    class: models::SynonymStereoTyped;
+    position: (1170.9989051643056,579.625);
+    rectangle: (180.79999923706055,86.0);
+  }
+  classView dfcaa3ce-a0e4-47ca-8a08-937129ab8c5e
+  {
+    class: models::ProductUpdated;
+    position: (763.9989051643056,565.625);
+    rectangle: (225.20000076293945,114.0);
+  }
+  classView 1e46b918-d9c4-4212-90b3-0b51992421dc
+  {
+    class: models::Trader;
+    position: (1536.7489051643056,594.1887199867499);
+    rectangle: (117.796875,58.0);
+  }
+  propertyView
+  {
+    property: models::Account.trades;
+    source: dbbcb7fc-5ca1-485d-a9e6-86bcb5813b9d;
+    target: 2607efb4-489b-451c-9fe0-3ee0f71191db;
+    points: [(977.9580688476562,781.5),(1204.9580688476562,782.5)];
+  }
+  propertyView
+  {
+    property: models::Trade.account;
+    source: 2607efb4-489b-451c-9fe0-3ee0f71191db;
+    target: dbbcb7fc-5ca1-485d-a9e6-86bcb5813b9d;
+    points: [(1156.9580688476562,819.5),(957.9580688476562,819.5)];
+  }
+  propertyView
+  {
+    property: models::Trade.events;
+    source: 2607efb4-489b-451c-9fe0-3ee0f71191db;
+    target: 3f9f55f3-0f34-4aa5-972b-6fb0d0839393;
+    points: [(1340.9989051643056,779.6887199867499),(1544.9989051643056,779.6887199867499)];
+  }
+  propertyView
+  {
+    property: models::TradeEvent.trade;
+    source: 3f9f55f3-0f34-4aa5-972b-6fb0d0839393;
+    target: 2607efb4-489b-451c-9fe0-3ee0f71191db;
+    points: [(1533.9989051643056,813.6887199867499),(1320.9989051643056,813.6887199867499)];
+  }
+  propertyView
+  {
+    property: models::ProductUpdated.synonyms;
+    source: dfcaa3ce-a0e4-47ca-8a08-937129ab8c5e;
+    target: 931cb999-5873-4fcd-8e9b-0ca4f1cf9a3f;
+    points: [(876.3880653205556,622.625),(1261.2725868049306,622.625)];
+  }
+  propertyView
+  {
+    property: models::SynonymStereoTyped.product;
+    source: 931cb999-5873-4fcd-8e9b-0ca4f1cf9a3f;
+    target: dfcaa3ce-a0e4-47ca-8a08-937129ab8c5e;
+    points: [(1261.2725868049306,622.625),(876.3880653205556,622.625)];
+  }
+  generalizationView
+  {
+    source: 742b39b1-983a-4913-bad9-a45654973427;
+    target: dbbcb7fc-5ca1-485d-a9e6-86bcb5813b9d;
+    points: [(893.2332801643056,950.25),(894.2945556640625,792.0)];
+  }
+}
+
+
+###Pure
+Enum models::ProductSynonymType
+{
+  CUSIP,
+  ISIN,
+  SEDOL
+}
+
+Class <<meta::pure::profiles::temporal.businesstemporal>> models::SynonymStereoTyped
+{
+  type: models::ProductSynonymType[1];
+  name: String[1];
+}
+
+Class {meta::pure::profiles::doc.doc = 'must pass date for isin/cusip/sedol now.'} models::ProductUpdated
+{
+  name: String[1];
+  classification: models::ProductClassification[1];
+  cusip(businessDate: StrictDate[1]) {$this.synonyms($businessDate)->filter(s|$s.type == models::ProductSynonymType.CUSIP)->toOne().name}: String[1];
+  isin(businessDate: StrictDate[1]) {$this.synonyms($businessDate)->filter(s|$s.type == models::ProductSynonymType.ISIN)->toOne().name}: String[1];
+  sedol(businessDate: StrictDate[1]) {$this.synonyms($businessDate)->filter(s|$s.type == models::ProductSynonymType.SEDOL)->toOne().name}: String[1];
+}
+
+Class {meta::pure::profiles::doc.doc = 'use tags to add metadata.'} models::AccountWithConstraints extends models::Account
+[
+  tradesNotDoubleBooked: $this->project([a|$a.trades.id], ['tradeId'])->groupBy('tradeId', 'count'->agg(x|$x, y|$y->count()))->filter(t|$t.getInteger('count') > 1)->tdsRows()->isEmpty(),
+  noTradesAfterCloseDate: true
+]
+{
+  isOpen() {$this.closeDate->isEmpty()}: Boolean[1];
+}
+
+Class models::TradeEvent
+{
+  eventType: String[1];
+  eventDate: StrictDate[1];
+  initiator: models::Trader[0..1];
+  trade: models::Trade[1];
+}
+
+Class models::Trader
+{
+  name: String[1];
+  address: String[1];
+}
+
+Class models::Trade
+{
+  id: Integer[1];
+  tradeDate: StrictDate[1];
+  quantity: Float[1];
+  settlementDateTime: DateTime[0..1];
+  product: models::ProductUpdated[0..1];
+  account: models::Account[0..1];
+  events: models::TradeEvent[*];
+  productIdentifier() {if($this.product->isNotEmpty(), |$this.product->toOne().name, |'Unknown')}: String[1];
+  eventsByDate(date: Date[1]) {$this.events->filter(e|$e.eventDate == $date)}: models::TradeEvent[*];
+  tradeDateEvent() {$this.eventsByDate($this.tradeDate->toOne())->toOne()}: models::TradeEvent[1];
+  tradeDataEventType() {$this.tradeDateEvent.eventType}: String[1];
+  initiator() {$this.tradeDateEvent.initiator}: models::Trader[0..1];
+  latestEventDate() {$this.events->map(e|$e.eventDate)->sort()->reverse()->at(0)}: StrictDate[1];
+}
+
+Class models::Account
+{
+  name: String[1];
+  createDate: StrictDate[1];
+  trades: models::Trade[*];
+  closeDate: StrictDate[0..1];
+}
+
+Class models::ProductClassification
+{
+  type: String[1];
+  description: String[1];
+}
+
+Association models::ProdSynonymMilestoned
+{
+  product: models::ProductUpdated[1];
+  synonyms: models::SynonymStereoTyped[*];
+}
